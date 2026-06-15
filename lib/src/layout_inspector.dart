@@ -114,9 +114,14 @@ const _kSkip = {
 
 class _LayoutInspectorState extends State<LayoutInspector>
     with TickerProviderStateMixin {
+  static const double _fabSize = 46;
+  static const double _fabMargin = 16;
+  static const double _fabDefaultBottomInset = 90;
+
   bool _active = false;
   _WidgetInfo? _info;
   Offset? _panelPos;
+  Offset? _fabPos;
 
   late final AnimationController _fadeCtrl = AnimationController(
     vsync: this,
@@ -260,13 +265,36 @@ class _LayoutInspectorState extends State<LayoutInspector>
   }
 
   void _dismiss() => _fadeCtrl.reverse().then((_) {
-        if (mounted) setState(() => _info = null);
-      });
+    if (mounted) setState(() => _info = null);
+  });
 
   void _toggle() => setState(() {
-        _active = !_active;
-        if (!_active) _dismiss();
-      });
+    _active = !_active;
+    if (!_active) _dismiss();
+  });
+
+  Offset _clampFabPos(Offset pos, Size size) {
+    final maxX = size.width - _fabSize - _fabMargin;
+    final maxY = size.height - _fabSize - _fabMargin;
+    return Offset(
+      pos.dx.clamp(_fabMargin, maxX),
+      pos.dy.clamp(_fabMargin, maxY),
+    );
+  }
+
+  Offset _resolvedFabPos(Size size) {
+    return _fabPos ??
+        Offset(
+          size.width - _fabSize - _fabMargin,
+          size.height - _fabSize - _fabDefaultBottomInset,
+        );
+  }
+
+  void _moveFab(Offset delta) {
+    final size = MediaQuery.of(context).size;
+    final next = _clampFabPos(_resolvedFabPos(size) + delta, size);
+    setState(() => _fabPos = next);
+  }
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
@@ -274,6 +302,9 @@ class _LayoutInspectorState extends State<LayoutInspector>
   Widget build(BuildContext context) {
     // Release mode: completely transparent, zero overhead
     if (kReleaseMode) return widget.child;
+
+    final screenSize = MediaQuery.of(context).size;
+    final fabPos = _clampFabPos(_resolvedFabPos(screenSize), screenSize);
 
     return Stack(
       children: [
@@ -286,8 +317,7 @@ class _LayoutInspectorState extends State<LayoutInspector>
               onTapDown: _onTap,
               behavior: HitTestBehavior.translucent,
               child: CustomPaint(
-                painter:
-                    _info == null ? null : _HighlightPainter(_info!),
+                painter: _info == null ? null : _HighlightPainter(_info!),
                 child: const SizedBox.expand(),
               ),
             ),
@@ -306,9 +336,13 @@ class _LayoutInspectorState extends State<LayoutInspector>
 
         // FAB toggle
         Positioned(
-          right: 16,
-          bottom: 90,
-          child: _InspectorFab(active: _active, onTap: _toggle),
+          left: fabPos.dx,
+          top: fabPos.dy,
+          child: _InspectorFab(
+            active: _active,
+            onTap: _toggle,
+            onDrag: _moveFab,
+          ),
         ),
       ],
     );
@@ -334,10 +368,7 @@ class _HighlightPainter extends CustomPainter {
     final rect = Rect.fromLTWH(info.x, info.y, info.width, info.height);
 
     // Glow fill
-    canvas.drawRect(
-      rect.inflate(3),
-      Paint()..color = _kCyan.withOpacity(0.08),
-    );
+    canvas.drawRect(rect.inflate(3), Paint()..color = _kCyan.withOpacity(0.08));
 
     // Dashed border
     _drawDashedRect(canvas, rect, _kCyan, 2.0);
@@ -468,16 +499,36 @@ class _InspectorPanel extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
               child: Column(
                 children: [
-                  _row(Icons.widgets_outlined, 'WIDGET', info.widgetType,
-                      _kCyan),
-                  _row(Icons.phone_android_outlined, 'SCREEN', info.screenName,
-                      _kGreen),
-                  _row(Icons.insert_drive_file_outlined, 'FILE', info.filePath,
-                      _kYellow),
-                  _row(Icons.straighten_outlined, 'SIZE', info.sizeLabel,
-                      _kPink),
-                  _row(Icons.place_outlined, 'POSITION', info.posLabel,
-                      _kPurple),
+                  _row(
+                    Icons.widgets_outlined,
+                    'WIDGET',
+                    info.widgetType,
+                    _kCyan,
+                  ),
+                  _row(
+                    Icons.phone_android_outlined,
+                    'SCREEN',
+                    info.screenName,
+                    _kGreen,
+                  ),
+                  _row(
+                    Icons.insert_drive_file_outlined,
+                    'FILE',
+                    info.filePath,
+                    _kYellow,
+                  ),
+                  _row(
+                    Icons.straighten_outlined,
+                    'SIZE',
+                    info.sizeLabel,
+                    _kPink,
+                  ),
+                  _row(
+                    Icons.place_outlined,
+                    'POSITION',
+                    info.posLabel,
+                    _kPurple,
+                  ),
                 ],
               ),
             ),
@@ -489,44 +540,44 @@ class _InspectorPanel extends StatelessWidget {
   }
 
   Widget _header() => Padding(
-        padding: const EdgeInsets.fromLTRB(14, 11, 10, 11),
-        child: Row(
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: const BoxDecoration(
-                color: _kCyan,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'LAYOUT INSPECTOR',
-              style: TextStyle(
-                color: _kCyan,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.4,
-                fontFamily: 'monospace',
-              ),
-            ),
-            const Spacer(),
-            GestureDetector(
-              onTap: onClose,
-              child: Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: _kDimText.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Icon(Icons.close, color: _kMuted, size: 13),
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.fromLTRB(14, 11, 10, 11),
+    child: Row(
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(
+            color: _kCyan,
+            shape: BoxShape.circle,
+          ),
         ),
-      );
+        const SizedBox(width: 8),
+        const Text(
+          'LAYOUT INSPECTOR',
+          style: TextStyle(
+            color: _kCyan,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.4,
+            fontFamily: 'monospace',
+          ),
+        ),
+        const Spacer(),
+        GestureDetector(
+          onTap: onClose,
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: _kDimText.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Icon(Icons.close, color: _kMuted, size: 13),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _row(IconData icon, String label, String value, Color accent) {
     return Padding(
@@ -571,31 +622,31 @@ class _InspectorPanel extends StatelessWidget {
   }
 
   Widget _footer() => Container(
-        decoration: const BoxDecoration(
-          color: _kBgDeep,
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(14),
-            bottomRight: Radius.circular(14),
+    decoration: const BoxDecoration(
+      color: _kBgDeep,
+      borderRadius: BorderRadius.only(
+        bottomLeft: Radius.circular(14),
+        bottomRight: Radius.circular(14),
+      ),
+    ),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+    child: Row(
+      children: const [
+        Icon(Icons.terminal_outlined, color: _kMuted, size: 10),
+        SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            'Full trace in console  •  debug only',
+            style: TextStyle(
+              color: _kMuted,
+              fontSize: 9,
+              fontFamily: 'monospace',
+            ),
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: Row(
-          children: const [
-            Icon(Icons.terminal_outlined, color: _kMuted, size: 10),
-            SizedBox(width: 5),
-            Expanded(
-              child: Text(
-                'Full trace in console  •  debug only',
-                style: TextStyle(
-                  color: _kMuted,
-                  fontSize: 9,
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
+      ],
+    ),
+  );
 }
 
 class _Divider extends StatelessWidget {
@@ -613,8 +664,13 @@ class _Divider extends StatelessWidget {
 class _InspectorFab extends StatefulWidget {
   final bool active;
   final VoidCallback onTap;
+  final ValueChanged<Offset> onDrag;
 
-  const _InspectorFab({required this.active, required this.onTap});
+  const _InspectorFab({
+    required this.active,
+    required this.onTap,
+    required this.onDrag,
+  });
 
   @override
   State<_InspectorFab> createState() => _InspectorFabState();
@@ -639,6 +695,7 @@ class _InspectorFabState extends State<_InspectorFab>
       animation: _pulse,
       builder: (_, __) => GestureDetector(
         onTap: widget.onTap,
+        onPanUpdate: (details) => widget.onDrag(details.delta),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           width: 46,
@@ -671,9 +728,7 @@ class _InspectorFabState extends State<_InspectorFab>
                   ],
           ),
           child: Icon(
-            widget.active
-                ? Icons.search_off_rounded
-                : Icons.search_rounded,
+            widget.active ? Icons.search_off_rounded : Icons.search_rounded,
             color: widget.active ? _kBgDeep : _kMuted,
             size: 20,
           ),
