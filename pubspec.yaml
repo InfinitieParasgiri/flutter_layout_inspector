@@ -1,0 +1,22 @@
+name: flutter_layout_inspector
+description: >
+  A zero-dependency Flutter layout inspector. Tap any widget in debug mode
+  to see its type, screen, file path, size and position. Auto-disabled in
+  release builds.
+version: 1.0.0
+homepage: https://github.com/YOUR_USERNAME/flutter_layout_inspector
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:

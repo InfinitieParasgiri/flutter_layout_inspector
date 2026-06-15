@@ -1,0 +1,17 @@
+name: flutter_layout_inspector_example
+description: Example app for flutter_layout_inspector.
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_layout_inspector:
+    path: ../   # local path — replace with git/pub when published
+
+flutter:
+  uses-material-design: true
